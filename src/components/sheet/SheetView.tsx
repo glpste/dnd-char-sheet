@@ -1,5 +1,6 @@
 import { AbilityColumn } from './AbilityBox';
 import { CombatColumn } from './CombatColumn';
+import { ProseColumn } from './ProseColumn';
 import { SavesSkillsColumn } from './SavesSkillsColumn';
 
 /** Four-column landscape layout: abilities · saves/skills · combat · prose. */
@@ -9,7 +10,7 @@ export function SheetView() {
       <AbilityColumn />
       <SavesSkillsColumn />
       <CombatColumn />
-      <div className="min-h-0" data-testid="prose-column" />
+      <ProseColumn />
     </div>
   );
 }

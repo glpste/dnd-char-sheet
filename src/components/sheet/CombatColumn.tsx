@@ -5,6 +5,7 @@ import { NumberField } from '../ui/NumberField';
 import { TextField } from '../ui/TextField';
 import { cx, panel, panelTitle } from '../ui/styles';
 import { DeathSaves } from './DeathSaves';
+import { Equipment } from './Equipment';
 import { HitDice } from './HitDice';
 import { HpBlock } from './HpBlock';
 import { WeaponsTable } from './WeaponsTable';
@@ -61,6 +62,7 @@ export function CombatColumn({ children }: { children?: React.ReactNode }) {
         <DeathSaves />
       </div>
       <WeaponsTable />
+      <Equipment />
       {children}
     </div>
   );
