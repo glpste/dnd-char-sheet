@@ -15,13 +15,14 @@ describe('SkillList', () => {
     renderWithCharacter(<SavesSkillsColumn />);
     const row = screen.getByTestId('skill-row-stealth');
     const dot = within(row).getByRole('button', { name: /Stealth proficiency/ });
-    expect(within(row).getByTestId('total')).toHaveTextContent('+4');
+    const total = within(row).getByLabelText('Stealth total');
+    expect(total).toHaveValue('+4');
     await userEvent.click(dot);
-    expect(within(row).getByTestId('total')).toHaveTextContent('+7');
+    expect(total).toHaveValue('+7');
     await userEvent.click(dot);
-    expect(within(row).getByTestId('total')).toHaveTextContent('+10');
+    expect(total).toHaveValue('+10');
     await userEvent.click(dot);
-    expect(within(row).getByTestId('total')).toHaveTextContent('+4');
+    expect(total).toHaveValue('+4');
   });
 
   it('updates passive perception when perception proficiency changes', async () => {
@@ -32,11 +33,39 @@ describe('SkillList', () => {
     expect(screen.getByLabelText('Passive perception')).toHaveValue('15');
   });
 
+  it('allows overriding a skill total and resetting it to auto', async () => {
+    renderWithCharacter(<SavesSkillsColumn />);
+    const row = screen.getByTestId('skill-row-stealth');
+    const total = within(row).getByLabelText('Stealth total');
+    expect(total).toHaveValue('+4');
+    await userEvent.clear(total);
+    await userEvent.type(total, '9{Enter}');
+    expect(total).toHaveValue('+9');
+    await userEvent.click(within(row).getByRole('button', { name: 'Reset Stealth total to auto' }));
+    expect(total).toHaveValue('+4');
+  });
+
+  it('allows overriding a saving throw and passive perception with reset', async () => {
+    renderWithCharacter(<SavesSkillsColumn />);
+    const row = screen.getByTestId('save-row-con');
+    const total = within(row).getByLabelText('Constitution save total');
+    await userEvent.clear(total);
+    await userEvent.type(total, '5{Enter}');
+    expect(total).toHaveValue('+5');
+    expect(within(row).getByRole('button', { name: 'Reset Constitution save total to auto' })).toBeInTheDocument();
+    const pp = screen.getByLabelText('Passive perception');
+    await userEvent.clear(pp);
+    await userEvent.type(pp, '20{Enter}');
+    expect(pp).toHaveValue('20');
+    await userEvent.click(screen.getByRole('button', { name: 'Reset Passive perception to auto' }));
+    expect(pp).toHaveValue('12');
+  });
+
   it('toggles saving throw proficiency', async () => {
     renderWithCharacter(<SavesSkillsColumn />);
     const row = screen.getByTestId('save-row-str');
-    expect(within(row).getByTestId('total')).toHaveTextContent('+3');
+    expect(within(row).getByLabelText('Strength save total')).toHaveValue('+3');
     await userEvent.click(within(row).getByRole('button', { name: /Strength save proficiency/ }));
-    expect(within(row).getByTestId('total')).toHaveTextContent('+6');
+    expect(within(row).getByLabelText('Strength save total')).toHaveValue('+6');
   });
 });

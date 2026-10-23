@@ -2,7 +2,7 @@ import type { Ability, Character, Weapon } from '../model/character';
 import { SKILLS, type SkillKey } from '../model/skills';
 
 export function clampScore(n: number): number {
-  if (Number.isNaN(n)) return 10;
+  if (typeof n !== 'number' || !Number.isFinite(n)) return 10;
   return Math.min(30, Math.max(1, Math.trunc(n)));
 }
 
@@ -11,7 +11,7 @@ export function abilityMod(score: number): number {
 }
 
 export function proficiencyBonus(level: number): number {
-  const l = Number.isNaN(level) ? 1 : Math.min(20, Math.max(1, Math.trunc(level)));
+  const l = typeof level !== 'number' || !Number.isFinite(level) ? 1 : Math.min(20, Math.max(1, Math.trunc(level)));
   return 2 + Math.floor((l - 1) / 4);
 }
 

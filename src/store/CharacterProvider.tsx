@@ -15,6 +15,7 @@ import { parseImport, serialize } from './exportImport';
 export const SAVE_DEBOUNCE_MS = 300;
 export const TOAST_MS = 5000;
 export const OTHER_TAB_MESSAGE = 'Another tab changed this character; your edit was kept';
+export const SAVE_FAILED_MESSAGE = 'Could not save to this browser’s storage. Export your characters before closing the tab.';
 
 export type SaveState = 'saved' | 'saving';
 
@@ -125,6 +126,8 @@ export function CharacterProvider({ adapter, children }: { adapter: StorageAdapt
     [adapter],
   );
 
+  const saveFailedRef = useRef(false);
+
   const flush = useCallback(() => {
     if (timerRef.current) {
       clearTimeout(timerRef.current);
@@ -132,11 +135,23 @@ export function CharacterProvider({ adapter, children }: { adapter: StorageAdapt
     }
     if (!pendingRef.current) return;
     const c = characterRef.current;
-    adapter.saveCharacter(c);
-    commitIndex(upsertSummary(indexRef.current, c));
+    try {
+      adapter.saveCharacter(c);
+      commitIndex(upsertSummary(indexRef.current, c));
+    } catch (err) {
+      // Quota exceeded or storage disabled: keep the edit pending so the next flush retries,
+      // and tell the user once so they can export before closing the tab.
+      console.error('dnd-sheet: could not save character', err);
+      if (!saveFailedRef.current) {
+        saveFailedRef.current = true;
+        pushToast(SAVE_FAILED_MESSAGE);
+      }
+      return;
+    }
+    saveFailedRef.current = false;
     pendingRef.current = false;
     setSaveState('saved');
-  }, [adapter, commitIndex]);
+  }, [adapter, commitIndex, pushToast]);
 
   const scheduleFlush = useCallback(() => {
     pendingRef.current = true;

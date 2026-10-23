@@ -41,6 +41,11 @@ describe('clampScore', () => {
     expect(clampScore(31)).toBe(30);
     expect(clampScore(NaN)).toBe(10);
   });
+  it('treats non-numbers and infinities as 10', () => {
+    expect(clampScore('abc' as unknown as number)).toBe(10);
+    expect(clampScore(Infinity)).toBe(10);
+    expect(proficiencyBonus('x' as unknown as number)).toBe(2);
+  });
 });
 
 describe('proficiencyBonus', () => {

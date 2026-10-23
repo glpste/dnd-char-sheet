@@ -2,7 +2,7 @@ import { act, render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { newCharacter, type Character } from '../model/character';
 import type { StorageAdapter, StorageChange, StorageIndex } from '../storage/adapter';
-import { CharacterProvider } from './CharacterProvider';
+import { CharacterProvider, type ImportResult } from './CharacterProvider';
 import { useCharacter, useRoster, useToast } from './useCharacter';
 
 function fakeAdapter(seed: Character[] = []) {
@@ -43,10 +43,13 @@ function fakeAdapter(seed: Character[] = []) {
   };
 }
 
+const importRef: { current: ((json: string, mode: 'add' | 'replace') => ImportResult) | null } = { current: null };
+
 function Probe() {
   const { character, dispatch, saveState } = useCharacter();
   const roster = useRoster();
   const toasts = useToast();
+  importRef.current = roster.importJson;
   return (
     <div>
       <span data-testid="name">{character.info.name}</span>
@@ -119,6 +122,52 @@ describe('CharacterProvider', () => {
     );
     await act(() => vi.advanceTimersByTimeAsync(350));
     expect(fake.chars.get(seed.id)?.info.name).toBe('Renamed');
+  });
+
+  it('reports a failed save once and keeps the edit pending', async () => {
+    const seed = newCharacter('Thalia');
+    const fake = setup([seed]);
+    fake.adapter.saveCharacter = () => {
+      throw new Error('QuotaExceededError');
+    };
+    await userEvent.click(screen.getByText('rename'));
+    await act(() => vi.advanceTimersByTimeAsync(350));
+    expect(screen.getByTestId('save')).toHaveTextContent('saving');
+    expect(screen.getByTestId('toasts')).toHaveTextContent('Could not save');
+    await userEvent.click(screen.getByText('rename'));
+    await act(() => vi.advanceTimersByTimeAsync(350));
+    expect(screen.getByTestId('toasts').querySelectorAll('li')).toHaveLength(1);
+  });
+
+  it('importJson adds characters with fresh ids or replaces by id', async () => {
+    const seed = newCharacter('Thalia');
+    const fake = setup([seed]);
+    const incoming = { ...seed, info: { ...seed.info, name: 'Imported' } };
+    const json = JSON.stringify({ app: 'dnd-sheet', version: 1, characters: [incoming] });
+    await act(async () => {
+      importRef.current!(json, 'add');
+    });
+    expect(screen.getByTestId('count')).toHaveTextContent('2');
+    expect(screen.getByTestId('name')).toHaveTextContent('Imported');
+    expect(fake.chars.get(seed.id)?.info.name).toBe('Thalia');
+    await act(async () => {
+      importRef.current!(json, 'replace');
+    });
+    expect(screen.getByTestId('count')).toHaveTextContent('2');
+    expect(fake.chars.get(seed.id)?.info.name).toBe('Imported');
+  });
+
+  it('a wrong-typed import renders cleanly', async () => {
+    const seed = newCharacter('Thalia');
+    setup([seed]);
+    const bad = JSON.parse(JSON.stringify(newCharacter('Bad')));
+    bad.info.name = null;
+    bad.abilities.dex = 'abc';
+    bad.weapons = [{}];
+    const result = await act(async () => importRef.current!(JSON.stringify(bad), 'add'));
+    expect(result.ok).toBe(true);
+    expect(screen.getByTestId('name')).toHaveTextContent('');
+    expect(screen.getByTestId('count')).toHaveTextContent('2');
   });
 
   it('create adds a summary and selects it', async () => {

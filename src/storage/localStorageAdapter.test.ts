@@ -15,6 +15,17 @@ describe('localStorage adapter', () => {
     expect(createLocalStorageAdapter().loadIndex()).toEqual({ activeId: null, characters: [] });
   });
 
+  it('drops malformed index entries', () => {
+    localStorage.setItem(
+      'dnd-sheet:v1:index',
+      JSON.stringify({ activeId: 'x', characters: [null, 'junk', { id: 7 }, { id: 'x', name: 'X', updatedAt: 't' }] }),
+    );
+    expect(createLocalStorageAdapter().loadIndex()).toEqual({
+      activeId: 'x',
+      characters: [{ id: 'x', name: 'X', updatedAt: 't' }],
+    });
+  });
+
   it('round-trips the index', () => {
     const a = createLocalStorageAdapter();
     const index = { activeId: 'x', characters: [{ id: 'x', name: 'X', updatedAt: 't' }] };

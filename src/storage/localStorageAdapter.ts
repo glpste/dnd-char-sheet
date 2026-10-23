@@ -24,9 +24,13 @@ export function createLocalStorageAdapter(storage: Storage = window.localStorage
       const raw = parseJson(storage.getItem(INDEX_KEY));
       if (typeof raw !== 'object' || raw === null) return { ...EMPTY_INDEX, characters: [] };
       const r = raw as Partial<StorageIndex>;
+      const characters = (Array.isArray(r.characters) ? r.characters : []).filter(
+        (s): s is StorageIndex['characters'][number] =>
+          typeof s === 'object' && s !== null && typeof (s as { id?: unknown }).id === 'string',
+      ).map((s) => ({ id: s.id, name: typeof s.name === 'string' ? s.name : '', updatedAt: typeof s.updatedAt === 'string' ? s.updatedAt : '' }));
       return {
         activeId: typeof r.activeId === 'string' ? r.activeId : null,
-        characters: Array.isArray(r.characters) ? r.characters : [],
+        characters,
       };
     },
     saveIndex(index) {

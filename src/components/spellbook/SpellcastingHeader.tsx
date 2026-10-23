@@ -7,10 +7,12 @@ import { cx, input, panel, panelTitle } from '../ui/styles';
 export function SpellcastingHeader() {
   const { character, dispatch } = useCharacter();
   const sb = character.spellbook;
+  const hasAbility = sb.ability !== null;
   const abilityMod = sb.ability ? mod(character, sb.ability) : 0;
   const autoDc = 8 + profBonus(character) + abilityMod;
   const autoAtk = profBonus(character) + abilityMod;
   const box = cx(panel, 'flex flex-col items-center px-3 py-1.5 text-center');
+  const dash = <span className="text-2xl font-medium text-zinc-400">—</span>;
   return (
     <div className="flex items-stretch gap-2">
       <div className={cx(box, 'items-start')}>
@@ -33,26 +35,34 @@ export function SpellcastingHeader() {
           ))}
         </select>
       </div>
-      <div className={box}>
+      <div className={box} data-testid="spell-dc">
         <div className={panelTitle}>Spell save DC</div>
-        <DerivedField
-          label="Spell save DC"
-          signed={false}
-          auto={autoDc}
-          override={sb.saveDcOverride}
-          onOverride={(n) => dispatch({ type: 'patch', patch: { spellbook: { saveDcOverride: n } } })}
-          inputClassName="w-12 text-2xl font-medium"
-        />
+        {hasAbility ? (
+          <DerivedField
+            label="Spell save DC"
+            signed={false}
+            auto={autoDc}
+            override={sb.saveDcOverride}
+            onOverride={(n) => dispatch({ type: 'patch', patch: { spellbook: { saveDcOverride: n } } })}
+            inputClassName="w-12 text-2xl font-medium"
+          />
+        ) : (
+          dash
+        )}
       </div>
-      <div className={box}>
+      <div className={box} data-testid="spell-attack">
         <div className={panelTitle}>Spell attack bonus</div>
-        <DerivedField
-          label="Spell attack bonus"
-          auto={autoAtk}
-          override={sb.attackOverride}
-          onOverride={(n) => dispatch({ type: 'patch', patch: { spellbook: { attackOverride: n } } })}
-          inputClassName="w-12 text-2xl font-medium"
-        />
+        {hasAbility ? (
+          <DerivedField
+            label="Spell attack bonus"
+            auto={autoAtk}
+            override={sb.attackOverride}
+            onOverride={(n) => dispatch({ type: 'patch', patch: { spellbook: { attackOverride: n } } })}
+            inputClassName="w-12 text-2xl font-medium"
+          />
+        ) : (
+          dash
+        )}
       </div>
     </div>
   );

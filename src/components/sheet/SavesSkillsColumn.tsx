@@ -1,26 +1,27 @@
 import { ABILITIES, ABILITY_LABELS, type Ability } from '../../model/character';
 import { SKILLS, type SkillKey } from '../../model/skills';
-import { formatMod, passivePerception, profBonus, proficiencyBonus, saveTotal, skillTotal } from '../../rules/derive';
+import { mod, profBonus, proficiencyBonus, skillTotal } from '../../rules/derive';
 import { useCharacter } from '../../store/useCharacter';
 import { DerivedField } from '../ui/DerivedField';
-import { NumberField } from '../ui/NumberField';
 import { Panel } from '../ui/StatBox';
 import { TextArea } from '../ui/TextArea';
 import { Toggle } from '../ui/Toggle';
 import { cx, panel, panelTitle } from '../ui/styles';
 import { ProficiencyDot } from './ProficiencyDot';
 
+const PROF_MULT = { none: 0, proficient: 1, expertise: 2 } as const;
+
 function Row({
   testId,
   label,
   abilityTag,
-  total,
+  children,
   dot,
 }: {
   testId: string;
   label: string;
   abilityTag?: string;
-  total: number;
+  children: React.ReactNode;
   dot: React.ReactNode;
 }) {
   return (
@@ -28,34 +29,45 @@ function Row({
       {dot}
       <span className="truncate">{label}</span>
       {abilityTag && <span className="text-[10px] uppercase text-zinc-400 dark:text-zinc-500">{abilityTag}</span>}
-      <span data-testid="total" className="ml-auto tabular-nums font-medium">
-        {formatMod(total)}
-      </span>
+      <span className="ml-auto">{children}</span>
     </div>
   );
 }
+
+const totalInput = 'w-9 px-0 text-right font-medium';
 
 export function SavingThrows() {
   const { character, dispatch } = useCharacter();
   return (
     <Panel title="Saving throws">
       <div className="grid grid-cols-2 gap-x-3">
-        {ABILITIES.map((a: Ability) => (
-          <Row
-            key={a}
-            testId={`save-row-${a}`}
-            label={ABILITY_LABELS[a]}
-            total={saveTotal(character, a)}
-            dot={
-              <ProficiencyDot
-                label={`${ABILITY_LABELS[a]} save`}
-                allowExpertise={false}
-                value={character.saves[a].proficient ? 'proficient' : 'none'}
-                onChange={(p) => dispatch({ type: 'patch', patch: { saves: { [a]: { proficient: p !== 'none' } } } })}
+        {ABILITIES.map((a: Ability) => {
+          const s = character.saves[a];
+          const auto = mod(character, a) + (s.proficient ? profBonus(character) : 0);
+          return (
+            <Row
+              key={a}
+              testId={`save-row-${a}`}
+              label={ABILITY_LABELS[a]}
+              dot={
+                <ProficiencyDot
+                  label={`${ABILITY_LABELS[a]} save`}
+                  allowExpertise={false}
+                  value={s.proficient ? 'proficient' : 'none'}
+                  onChange={(p) => dispatch({ type: 'patch', patch: { saves: { [a]: { proficient: p !== 'none' } } } })}
+                />
+              }
+            >
+              <DerivedField
+                label={`${ABILITY_LABELS[a]} save total`}
+                auto={auto}
+                override={s.override}
+                onOverride={(n) => dispatch({ type: 'patch', patch: { saves: { [a]: { override: n } } } })}
+                inputClassName={totalInput}
               />
-            }
-          />
-        ))}
+            </Row>
+          );
+        })}
       </div>
     </Panel>
   );
@@ -66,24 +78,35 @@ export function SkillList() {
   return (
     <Panel title="Skills" className="flex-1">
       <div className="grid grid-cols-2 gap-x-3">
-        {SKILLS.map((s) => (
-          <Row
-            key={s.key}
-            testId={`skill-row-${s.key}`}
-            label={s.label}
-            abilityTag={s.ability}
-            total={skillTotal(character, s.key)}
-            dot={
-              <ProficiencyDot
-                label={s.label}
-                value={character.skills[s.key].proficiency}
-                onChange={(proficiency) =>
-                  dispatch({ type: 'patch', patch: { skills: { [s.key as SkillKey]: { proficiency } } } })
-                }
+        {SKILLS.map((s) => {
+          const entry = character.skills[s.key];
+          const auto = mod(character, s.ability) + profBonus(character) * PROF_MULT[entry.proficiency];
+          return (
+            <Row
+              key={s.key}
+              testId={`skill-row-${s.key}`}
+              label={s.label}
+              abilityTag={s.ability}
+              dot={
+                <ProficiencyDot
+                  label={s.label}
+                  value={entry.proficiency}
+                  onChange={(proficiency) =>
+                    dispatch({ type: 'patch', patch: { skills: { [s.key as SkillKey]: { proficiency } } } })
+                  }
+                />
+              }
+            >
+              <DerivedField
+                label={`${s.label} total`}
+                auto={auto}
+                override={entry.override}
+                onOverride={(n) => dispatch({ type: 'patch', patch: { skills: { [s.key as SkillKey]: { override: n } } } })}
+                inputClassName={totalInput}
               />
-            }
-          />
-        ))}
+            </Row>
+          );
+        })}
       </div>
     </Panel>
   );
@@ -91,6 +114,7 @@ export function SkillList() {
 
 export function SavesSkillsColumn() {
   const { character, dispatch } = useCharacter();
+  const autoPassive = 10 + skillTotal(character, 'perception');
   return (
     <div className="flex min-h-0 flex-col gap-1.5">
       <div className="grid grid-cols-2 gap-1.5">
@@ -117,21 +141,13 @@ export function SavesSkillsColumn() {
       <SkillList />
       <div className={cx(panel, 'flex items-center justify-between px-2 py-1.5')}>
         <span className={panelTitle}>Passive perception</span>
-        <NumberField
-          aria-label="Passive perception"
-          value={passivePerception(character)}
-          min={0}
-          max={50}
-          onChange={(n) =>
-            dispatch({
-              type: 'patch',
-              patch: { passivePerceptionOverride: n === 10 + skillTotal(character, 'perception') ? undefined : n },
-            })
-          }
-          className={cx(
-            'w-10 text-center font-medium',
-            character.passivePerceptionOverride !== undefined && 'border-dashed border-amber-500/70',
-          )}
+        <DerivedField
+          label="Passive perception"
+          signed={false}
+          auto={autoPassive}
+          override={character.passivePerceptionOverride}
+          onOverride={(n) => dispatch({ type: 'patch', patch: { passivePerceptionOverride: n } })}
+          inputClassName="font-medium"
         />
       </div>
       <Panel title="Other proficiencies and languages" className="max-h-40">

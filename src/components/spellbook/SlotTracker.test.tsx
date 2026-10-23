@@ -24,6 +24,13 @@ describe('SpellcastingHeader', () => {
     expect(screen.getByLabelText('Spell save DC')).toHaveValue('13');
     expect(screen.getByLabelText('Spell attack bonus')).toHaveValue('+5');
   });
+
+  it('shows a dash when no spellcasting ability is chosen', () => {
+    renderWithCharacter(<SpellcastingHeader />);
+    expect(screen.getByTestId('spell-dc')).toHaveTextContent('—');
+    expect(screen.getByTestId('spell-attack')).toHaveTextContent('—');
+    expect(screen.queryByLabelText('Spell save DC')).not.toBeInTheDocument();
+  });
 });
 
 describe('SlotTracker', () => {
