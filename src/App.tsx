@@ -1,3 +1,4 @@
+import { CheatSheetView } from './components/cheatsheet/CheatSheetView';
 import { HeaderBar, VIEW_LABELS } from './components/header/HeaderBar';
 import { SheetView } from './components/sheet/SheetView';
 import { SpellbookView } from './components/spellbook/SpellbookView';
@@ -13,6 +14,7 @@ export default function App() {
         <h1 className="sr-only">{VIEW_LABELS[view]}</h1>
         {view === 'sheet' && <SheetView />}
         {view === 'spellbook' && <SpellbookView />}
+        {view === 'cheatsheet' && <CheatSheetView />}
       </main>
       <ToastHost />
     </div>
