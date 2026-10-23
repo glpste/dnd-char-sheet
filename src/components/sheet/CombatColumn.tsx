@@ -7,6 +7,7 @@ import { cx, panel, panelTitle } from '../ui/styles';
 import { DeathSaves } from './DeathSaves';
 import { HitDice } from './HitDice';
 import { HpBlock } from './HpBlock';
+import { WeaponsTable } from './WeaponsTable';
 
 function TopStats() {
   const { character, dispatch } = useCharacter();
@@ -59,6 +60,7 @@ export function CombatColumn({ children }: { children?: React.ReactNode }) {
         <HitDice />
         <DeathSaves />
       </div>
+      <WeaponsTable />
       {children}
     </div>
   );
