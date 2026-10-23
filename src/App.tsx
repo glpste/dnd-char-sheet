@@ -1,4 +1,5 @@
 import { HeaderBar, VIEW_LABELS } from './components/header/HeaderBar';
+import { SheetView } from './components/sheet/SheetView';
 import { ToastHost } from './components/ui/ToastHost';
 import { useHashRoute } from './router/useHashRoute';
 
@@ -9,6 +10,7 @@ export default function App() {
       <HeaderBar view={view} setView={setView} />
       <main className="min-h-0 flex-1 p-2">
         <h1 className="sr-only">{VIEW_LABELS[view]}</h1>
+        {view === 'sheet' && <SheetView />}
       </main>
       <ToastHost />
     </div>
