@@ -11,7 +11,7 @@ export function ToastHost() {
         <div
           key={t.id}
           role="status"
-          className="pointer-events-auto flex items-center gap-3 rounded-md border border-zinc-300 bg-white px-3 py-2 text-sm shadow-lg motion-safe:animate-[fade-in_150ms_ease-out] dark:border-zinc-700 dark:bg-zinc-900"
+          className="pointer-events-auto flex items-center gap-3 rounded-md border border-zinc-300 bg-white px-3 py-2 text-sm shadow-lg motion-safe:animate-fade-in dark:border-zinc-700 dark:bg-zinc-900"
         >
           <span>{t.message}</span>
           {t.action && (

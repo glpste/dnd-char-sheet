@@ -17,11 +17,12 @@ describe('export/import', () => {
     expect(parseImport('{"app":"dnd-sheet","version":1,"characters":[]}').ok).toBe(false);
   });
 
-  it('keeps good characters and drops bad ones', () => {
+  it('keeps good characters, drops bad ones, and counts the skipped', () => {
     const a = newCharacter('A');
     const json = JSON.stringify({ app: 'dnd-sheet', version: 1, characters: [{ junk: true }, a] });
     const out = parseImport(json);
     expect(out.ok && out.characters.map((c) => c.id)).toEqual([a.id]);
+    expect(out.ok && out.skipped).toBe(1);
   });
 
   it('accepts a bare single character object', () => {

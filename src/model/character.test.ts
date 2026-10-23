@@ -13,6 +13,20 @@ describe('newCharacter', () => {
     expect(Object.values(c.spellbook.slots).every((s) => s.total === 0 && s.used === 0)).toBe(true);
     expect(c.id).not.toBe(newCharacter().id);
   });
+  it('still produces unique ids when crypto.randomUUID is unavailable', () => {
+    const original = crypto.randomUUID;
+    Object.defineProperty(crypto, 'randomUUID', { value: undefined, configurable: true });
+    try {
+      const a = newCharacter().id;
+      const b = newCharacter().id;
+      expect(typeof a).toBe('string');
+      expect(a.length).toBeGreaterThan(8);
+      expect(a).not.toBe(b);
+    } finally {
+      Object.defineProperty(crypto, 'randomUUID', { value: original, configurable: true });
+    }
+  });
+
   it('lists 18 skills in PDF order', () => {
     expect(SKILLS).toHaveLength(18);
     expect(SKILLS[0]?.label).toBe('Acrobatics');

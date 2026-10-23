@@ -11,7 +11,9 @@ export interface ExportFile {
   characters: Character[];
 }
 
-export type ImportParse = { ok: true; characters: Character[] } | { ok: false; error: string };
+export type ImportParse =
+  | { ok: true; characters: Character[]; skipped: number }
+  | { ok: false; error: string };
 
 export function serialize(characters: Character[]): string {
   const file: ExportFile = {
@@ -23,7 +25,7 @@ export function serialize(characters: Character[]): string {
   return JSON.stringify(file, null, 2);
 }
 
-/** Accepts an export file or a single bare character. Drops entries that do not migrate. */
+/** Accepts an export file or a single bare character. Entries that do not migrate are counted in `skipped`. */
 export function parseImport(json: string): ImportParse {
   let raw: unknown;
   try {
@@ -41,7 +43,7 @@ export function parseImport(json: string): ImportParse {
   if (characters.length === 0) {
     return { ok: false, error: 'No characters found in that file.' };
   }
-  return { ok: true, characters };
+  return { ok: true, characters, skipped: candidates.length - characters.length };
 }
 
 export function downloadJson(filename: string, json: string): void {
@@ -51,7 +53,8 @@ export function downloadJson(filename: string, json: string): void {
   a.href = url;
   a.download = filename;
   a.click();
-  URL.revokeObjectURL(url);
+  // Revoke after the click has been dispatched; some browsers abort the download if revoked synchronously.
+  setTimeout(() => URL.revokeObjectURL(url), 0);
 }
 
 export function slugify(name: string): string {

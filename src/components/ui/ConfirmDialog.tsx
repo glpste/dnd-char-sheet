@@ -13,9 +13,12 @@ export interface ConfirmDialogProps {
   danger?: boolean;
 }
 
+const FOCUSABLE = 'button:not([disabled]), input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])';
+
 /**
  * Modal confirmation. Rendered as a plain overlay (not <dialog>) so it behaves the
- * same in jsdom and browsers; Escape cancels, focus lands on the confirm button.
+ * same in jsdom and browsers. Focus starts on the confirm button, Tab cycles inside
+ * the dialog, Escape cancels, and focus returns to the opener on close.
  */
 export function ConfirmDialog({
   open,
@@ -29,15 +32,36 @@ export function ConfirmDialog({
   danger = false,
 }: ConfirmDialogProps) {
   const confirmRef = useRef<HTMLButtonElement>(null);
+  const panelRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     if (!open) return;
+    const opener = document.activeElement instanceof HTMLElement ? document.activeElement : null;
     confirmRef.current?.focus();
     const onKey = (e: globalThis.KeyboardEvent) => {
-      if (e.key === 'Escape') onCancel();
+      if (e.key === 'Escape') {
+        onCancel();
+        return;
+      }
+      if (e.key !== 'Tab' || !panelRef.current) return;
+      const items = [...panelRef.current.querySelectorAll<HTMLElement>(FOCUSABLE)];
+      if (items.length === 0) return;
+      const first = items[0]!;
+      const last = items[items.length - 1]!;
+      const active = document.activeElement;
+      if (e.shiftKey && (active === first || !panelRef.current.contains(active))) {
+        e.preventDefault();
+        last.focus();
+      } else if (!e.shiftKey && (active === last || !panelRef.current.contains(active))) {
+        e.preventDefault();
+        first.focus();
+      }
     };
     window.addEventListener('keydown', onKey);
-    return () => window.removeEventListener('keydown', onKey);
+    return () => {
+      window.removeEventListener('keydown', onKey);
+      opener?.focus();
+    };
   }, [open, onCancel]);
 
   if (!open) return null;
@@ -50,6 +74,7 @@ export function ConfirmDialog({
       }}
     >
       <div
+        ref={panelRef}
         role="dialog"
         aria-modal="true"
         aria-labelledby="confirm-title"
@@ -60,16 +85,16 @@ export function ConfirmDialog({
         </h2>
         {children && <div className="mt-2 text-sm text-zinc-600 dark:text-zinc-300">{children}</div>}
         <div className="mt-4 flex justify-end gap-2">
-          <button type="button" className={btn} onClick={onCancel}>
-            Cancel
+          <button ref={confirmRef} type="button" className={cx(danger ? btnDanger : btnPrimary)} onClick={onConfirm}>
+            {confirmLabel}
           </button>
           {secondaryLabel && onSecondary && (
             <button type="button" className={btn} onClick={onSecondary}>
               {secondaryLabel}
             </button>
           )}
-          <button ref={confirmRef} type="button" className={cx(danger ? btnDanger : btnPrimary)} onClick={onConfirm}>
-            {confirmLabel}
+          <button type="button" className={btn} onClick={onCancel}>
+            Cancel
           </button>
         </div>
       </div>

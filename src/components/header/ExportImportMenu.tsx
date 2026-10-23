@@ -1,14 +1,21 @@
 import { useEffect, useRef, useState } from 'react';
+import type { ImportResult } from '../../store/CharacterProvider';
 import { downloadJson, parseImport, slugify } from '../../store/exportImport';
 import { useRoster, useToast } from '../../store/useCharacter';
 import { ConfirmDialog } from '../ui/ConfirmDialog';
 import { btn, menu, menuItem } from '../ui/styles';
 
+export function importResultMessage(result: ImportResult): string {
+  if (!result.ok) return result.error;
+  const base = `Imported ${result.count} character${result.count === 1 ? '' : 's'}`;
+  return result.skipped > 0 ? `${base}, ${result.skipped} skipped` : base;
+}
+
 export function ExportImportMenu() {
   const { summaries, activeId, exportAll, exportOne, importJson } = useRoster();
   const { pushToast } = useToast();
   const [open, setOpen] = useState(false);
-  const [pendingImport, setPendingImport] = useState<{ json: string; count: number } | null>(null);
+  const [pendingImport, setPendingImport] = useState<{ json: string; count: number; skipped: number } | null>(null);
   const rootRef = useRef<HTMLDivElement>(null);
   const fileRef = useRef<HTMLInputElement>(null);
 
@@ -17,8 +24,15 @@ export function ExportImportMenu() {
     const onDown = (e: MouseEvent) => {
       if (!rootRef.current?.contains(e.target as Node)) setOpen(false);
     };
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') setOpen(false);
+    };
     document.addEventListener('mousedown', onDown);
-    return () => document.removeEventListener('mousedown', onDown);
+    document.addEventListener('keydown', onKey);
+    return () => {
+      document.removeEventListener('mousedown', onDown);
+      document.removeEventListener('keydown', onKey);
+    };
   }, [open]);
 
   const activeName = summaries.find((s) => s.id === activeId)?.name ?? 'character';
@@ -32,14 +46,14 @@ export function ExportImportMenu() {
       pushToast(parsed.error);
       return;
     }
-    setPendingImport({ json, count: parsed.characters.length });
+    setPendingImport({ json, count: parsed.characters.length, skipped: parsed.skipped });
   };
 
   const finishImport = (mode: 'add' | 'replace') => {
     if (!pendingImport) return;
     const result = importJson(pendingImport.json, mode);
     setPendingImport(null);
-    pushToast(result.ok ? `Imported ${result.count} character${result.count === 1 ? '' : 's'}` : result.error);
+    pushToast(importResultMessage(result));
   };
 
   return (
@@ -105,8 +119,9 @@ export function ExportImportMenu() {
         onConfirm={() => finishImport('add')}
         onCancel={() => setPendingImport(null)}
       >
-        Found {pendingImport?.count} character{pendingImport?.count === 1 ? '' : 's'}. Add them as new
-        characters, or replace any existing character that has the same id?
+        Found {pendingImport?.count} character{pendingImport?.count === 1 ? '' : 's'}
+        {pendingImport && pendingImport.skipped > 0 ? ` (${pendingImport.skipped} unreadable entr${pendingImport.skipped === 1 ? 'y' : 'ies'} will be skipped)` : ''}.
+        Add them as new characters, or replace any existing character that has the same id?
       </ConfirmDialog>
     </div>
   );

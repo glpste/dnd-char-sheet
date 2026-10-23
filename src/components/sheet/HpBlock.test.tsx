@@ -43,6 +43,18 @@ describe('HpBlock', () => {
     expect(current()).toHaveValue('31');
   });
 
+  it('keeps only one Undo toast and does not revert a max edit', async () => {
+    setup();
+    await userEvent.click(screen.getByRole('button', { name: '−1' }));
+    await userEvent.click(screen.getByRole('button', { name: '−1' }));
+    expect(screen.getAllByRole('button', { name: 'Undo' })).toHaveLength(1);
+    await userEvent.clear(max());
+    await userEvent.type(max(), '50{Enter}');
+    await userEvent.click(screen.getByRole('button', { name: 'Undo' }));
+    expect(temp()).toHaveValue('4');
+    expect(max()).toHaveValue('50');
+  });
+
   it('lowering max clamps current', async () => {
     setup();
     await userEvent.clear(max());

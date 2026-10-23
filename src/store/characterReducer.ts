@@ -17,7 +17,6 @@ export type DeepPartial<T> = T extends (infer U)[]
 
 export type Action =
   | { type: 'patch'; patch: DeepPartial<Character> }
-  | { type: 'set'; character: Character }
   | { type: 'hp'; delta: number }
   | { type: 'weapon/add' }
   | { type: 'weapon/update'; id: string; patch: Partial<Weapon> }
@@ -70,14 +69,25 @@ function normalize(c: Character): Character {
   return { ...c, abilities, info: { ...c.info, level }, combat: { ...c.combat, hp } };
 }
 
-function move<T extends { id: string }>(list: T[], id: string, dir: -1 | 1): T[] {
+/**
+ * Swap `id` with its nearest neighbour in `dir` among items that satisfy `sameGroup`.
+ * Items outside the group (e.g. spells of other levels) keep their positions.
+ */
+function move<T extends { id: string }>(
+  list: T[],
+  id: string,
+  dir: -1 | 1,
+  sameGroup: (a: T, b: T) => boolean = () => true,
+): T[] {
   const i = list.findIndex((x) => x.id === id);
-  const j = i + dir;
-  if (i < 0 || j < 0 || j >= list.length) return list;
+  if (i < 0) return list;
+  const me = list[i]!;
+  let j = i + dir;
+  while (j >= 0 && j < list.length && !sameGroup(me, list[j]!)) j += dir;
+  if (j < 0 || j >= list.length) return list;
   const out = [...list];
-  const a = out[i]!;
-  out[i] = out[j]!;
-  out[j] = a;
+  out[i] = list[j]!;
+  out[j] = me;
   return out;
 }
 
@@ -89,8 +99,6 @@ function insertAt<T>(list: T[], item: T, index: number): T[] {
 
 function apply(c: Character, a: Action): Character {
   switch (a.type) {
-    case 'set':
-      return a.character;
     case 'patch':
       return deepMerge(c, a.patch);
     case 'hp': {
@@ -129,7 +137,10 @@ function apply(c: Character, a: Action): Character {
     case 'spell/restore':
       return { ...c, spellbook: { ...c.spellbook, spells: insertAt(c.spellbook.spells, a.spell, a.index) } };
     case 'spell/move':
-      return { ...c, spellbook: { ...c.spellbook, spells: move(c.spellbook.spells, a.id, a.dir) } };
+      return {
+        ...c,
+        spellbook: { ...c.spellbook, spells: move(c.spellbook.spells, a.id, a.dir, (x, y) => x.level === y.level) },
+      };
     case 'slots/toggle': {
       const slot = c.spellbook.slots[a.level];
       // Clicking pip i (0-based): if it is already used, un-use it and everything after; else use up to and including it.

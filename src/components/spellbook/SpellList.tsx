@@ -88,8 +88,8 @@ export function SpellList() {
               {g.level === 0 ? 'Cantrips' : `Level ${g.level}`}
             </h3>
             <ul>
-              {g.spells.map(({ s, index }) => (
-                <SpellEntry key={s.id} spell={s} index={index} count={spells.length} />
+              {g.spells.map(({ s, index }, i) => (
+                <SpellEntry key={s.id} spell={s} index={index} isFirst={i === 0} isLast={i === g.spells.length - 1} />
               ))}
             </ul>
           </section>

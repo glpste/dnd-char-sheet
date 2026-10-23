@@ -31,6 +31,16 @@ describe('NumberField', () => {
     expect(screen.getByTestId('out')).toHaveTextContent('30');
   });
 
+  it('commits exactly once on Enter', async () => {
+    const onChange = vi.fn();
+    render(<NumberField aria-label="Score" value={12} onChange={onChange} />);
+    const input = screen.getByLabelText('Score');
+    await userEvent.clear(input);
+    await userEvent.type(input, '7{Enter}');
+    expect(onChange).toHaveBeenCalledTimes(1);
+    expect(onChange).toHaveBeenCalledWith(7);
+  });
+
   it('arrow keys step by one', async () => {
     render(<Harness />);
     const input = screen.getByLabelText('Score');

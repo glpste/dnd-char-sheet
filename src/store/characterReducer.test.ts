@@ -76,6 +76,19 @@ describe('characterReducer spells and slots', () => {
     c = characterReducer(c, { type: 'spell/remove', id: s.id });
     expect(c.spellbook.spells.find((x) => x.id === s.id)).toBeUndefined();
   });
+  it('moves a spell relative to its neighbours within the same level', () => {
+    let c = base();
+    const l1a = { ...newSpell(1), name: 'A1' };
+    const l0 = { ...newSpell(0), name: 'C0' };
+    const l1b = { ...newSpell(1), name: 'B1' };
+    c.spellbook.spells = [l1a, l0, l1b];
+    c = characterReducer(c, { type: 'spell/move', id: l1b.id, dir: -1 });
+    // B1 jumps over the cantrip to sit before A1; the cantrip is untouched.
+    expect(c.spellbook.spells.map((s) => s.name)).toEqual(['B1', 'C0', 'A1']);
+    c = characterReducer(c, { type: 'spell/move', id: l0.id, dir: -1 });
+    expect(c.spellbook.spells.map((s) => s.name)).toEqual(['B1', 'C0', 'A1']);
+  });
+
   it('toggles slot pips to the clicked index', () => {
     let c = base();
     c.spellbook.slots[1] = { total: 4, used: 1 };

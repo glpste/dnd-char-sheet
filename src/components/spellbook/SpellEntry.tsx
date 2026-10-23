@@ -10,7 +10,19 @@ export function levelLabel(level: SpellLevel): string {
   return level === 0 ? 'Cantrip' : `Level ${level}`;
 }
 
-export function SpellEntry({ spell, index, count }: { spell: Spell; index: number; count: number }) {
+export function SpellEntry({
+  spell,
+  index,
+  isFirst,
+  isLast,
+}: {
+  spell: Spell;
+  /** Position in the flat spell list (used to restore after undo). */
+  index: number;
+  /** Position within the spell's level group (drives the move buttons). */
+  isFirst: boolean;
+  isLast: boolean;
+}) {
   const { dispatch } = useCharacter();
   const { pushToast } = useToast();
   const [open, setOpen] = useState(!spell.name);
@@ -84,10 +96,10 @@ export function SpellEntry({ spell, index, count }: { spell: Spell; index: numbe
             <TextArea aria-label="Description" value={s.description} minRows={3} placeholder="What the spell does, damage, saves, higher-level scaling…" onChange={(v) => update({ description: v })} className={field} />
           </label>
           <div className="col-span-5 flex justify-end gap-1">
-            <button type="button" className={btnGhost} aria-label={`Move ${name} up`} disabled={index === 0} onClick={() => dispatch({ type: 'spell/move', id: s.id, dir: -1 })}>
+            <button type="button" className={btnGhost} aria-label={`Move ${name} up`} disabled={isFirst} onClick={() => dispatch({ type: 'spell/move', id: s.id, dir: -1 })}>
               ↑
             </button>
-            <button type="button" className={btnGhost} aria-label={`Move ${name} down`} disabled={index === count - 1} onClick={() => dispatch({ type: 'spell/move', id: s.id, dir: 1 })}>
+            <button type="button" className={btnGhost} aria-label={`Move ${name} down`} disabled={isLast} onClick={() => dispatch({ type: 'spell/move', id: s.id, dir: 1 })}>
               ↓
             </button>
             <button type="button" className={cx(btnGhost, 'text-red-700 dark:text-red-400')} aria-label={`Remove ${name}`} onClick={remove}>

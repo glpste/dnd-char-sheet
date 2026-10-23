@@ -1,4 +1,4 @@
-import { useEffect, useState, type KeyboardEvent } from 'react';
+import { useEffect, useRef, useState, type KeyboardEvent } from 'react';
 import { cx, input } from './styles';
 
 export interface NumberFieldProps {
@@ -30,12 +30,16 @@ function format(n: number, signed: boolean): string {
 export function NumberField({ value, onChange, min, max, className, signed = false, ...rest }: NumberFieldProps) {
   const [text, setText] = useState(() => format(value, signed));
   const [editing, setEditing] = useState(false);
+  // Enter commits and then blurs; the blur must not commit a second time.
+  const committedRef = useRef(false);
 
   useEffect(() => {
     if (!editing) setText(format(value, signed));
   }, [value, signed, editing]);
 
   const commit = (raw: string) => {
+    if (committedRef.current) return;
+    committedRef.current = true;
     const parsed = Number.parseInt(raw.replace(/^\+/, ''), 10);
     if (Number.isNaN(parsed)) {
       setText(format(value, signed));
@@ -78,6 +82,7 @@ export function NumberField({ value, onChange, min, max, className, signed = fal
       onChange={(e) => setText(e.target.value)}
       onFocus={(e) => {
         setEditing(true);
+        committedRef.current = false;
         e.target.select();
       }}
       onBlur={(e) => {

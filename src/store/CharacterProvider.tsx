@@ -15,6 +15,7 @@ import { parseImport, serialize } from './exportImport';
 export const SAVE_DEBOUNCE_MS = 300;
 export const TOAST_MS = 5000;
 export const OTHER_TAB_MESSAGE = 'Another tab changed this character; your edit was kept';
+export const OTHER_TAB_DELETED_MESSAGE = 'This character was deleted in another tab; your copy was kept';
 export const SAVE_FAILED_MESSAGE = 'Could not save to this browser’s storage. Export your characters before closing the tab.';
 
 export type SaveState = 'saved' | 'saving';
@@ -25,7 +26,9 @@ export interface Toast {
   action?: { label: string; onClick: () => void };
 }
 
-export type ImportResult = { ok: true; count: number } | { ok: false; error: string };
+export type ImportResult = { ok: true; count: number; skipped: number } | { ok: false; error: string };
+
+type HpSnapshot = { current: number; temp: number };
 
 export interface CharacterContextValue {
   character: Character;
@@ -43,7 +46,8 @@ export interface CharacterContextValue {
   exportOne: (id: string) => string;
   importJson: (json: string, mode: 'add' | 'replace') => ImportResult;
   toasts: Toast[];
-  pushToast: (message: string, action?: Toast['action']) => void;
+  /** Returns the toast id; an identical visible message is reused instead of duplicated. */
+  pushToast: (message: string, action?: Toast['action']) => string;
   dismissToast: (id: string) => void;
 }
 
@@ -62,28 +66,33 @@ function upsertSummary(index: StorageIndex, c: Character, activeId: string = ind
   };
 }
 
+/** Union of two summary lists; `ours` wins for ids present in both, order follows `ours` then new ones from `theirs`. */
+function mergeSummaries(ours: CharacterSummary[], theirs: CharacterSummary[]): CharacterSummary[] {
+  const seen = new Set(ours.map((s) => s.id));
+  return [...ours, ...theirs.filter((s) => !seen.has(s.id))];
+}
+
 interface Loaded {
   index: StorageIndex;
   character: Character;
 }
 
-/** Load the active character, dropping index entries whose records are unreadable. */
+/**
+ * Pick the active character. Index entries whose records cannot be read are kept
+ * (so a later migration can still recover them) but are never auto-selected.
+ */
 function initialLoad(adapter: StorageAdapter): Loaded {
   const stored = adapter.loadIndex();
-  const characters = stored.characters.filter((s) => adapter.loadCharacter(s.id) !== null);
-  const activeId =
-    stored.activeId && characters.some((s) => s.id === stored.activeId) ? stored.activeId : characters[0]?.id;
-  const existing = activeId ? adapter.loadCharacter(activeId) : null;
+  const readable = (id: string | null | undefined) => (id ? adapter.loadCharacter(id) : null);
+  const existing = readable(stored.activeId) ?? stored.characters.map((s) => readable(s.id)).find((c) => c !== null) ?? null;
   if (existing) {
-    const index = { activeId: existing.id, characters };
-    if (index.characters.length !== stored.characters.length || index.activeId !== stored.activeId) {
-      adapter.saveIndex(index);
-    }
+    const index = { activeId: existing.id, characters: stored.characters };
+    if (index.activeId !== stored.activeId) adapter.saveIndex(index);
     return { index, character: existing };
   }
   const fresh = newCharacter();
   adapter.saveCharacter(fresh);
-  const index = upsertSummary({ activeId: fresh.id, characters }, fresh, fresh.id);
+  const index = upsertSummary({ activeId: fresh.id, characters: stored.characters }, fresh, fresh.id);
   adapter.saveIndex(index);
   return { index, character: fresh };
 }
@@ -94,39 +103,55 @@ export function CharacterProvider({ adapter, children }: { adapter: StorageAdapt
   const [index, setIndex] = useState<StorageIndex>(loaded.index);
   const [saveState, setSaveState] = useState<SaveState>('saved');
   const [toasts, setToasts] = useState<Toast[]>([]);
-  const [hpBefore, setHpBefore] = useState<Character['combat']['hp'] | null>(null);
+  const [hpBefore, setHpBefore] = useState<HpSnapshot | null>(null);
 
   // Refs so flush/subscribe callbacks always see the latest values without re-subscribing.
   const characterRef = useRef(character);
   characterRef.current = character;
   const indexRef = useRef(index);
   indexRef.current = index;
+  const toastsRef = useRef(toasts);
+  toastsRef.current = toasts;
   const pendingRef = useRef(false);
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const saveFailedRef = useRef(false);
 
   const dismissToast = useCallback((id: string) => {
     setToasts((ts) => ts.filter((t) => t.id !== id));
   }, []);
 
   const pushToast = useCallback(
-    (message: string, action?: Toast['action']) => {
+    (message: string, action?: Toast['action']): string => {
+      const existing = toastsRef.current.find((t) => t.message === message && !t.action && !action);
+      if (existing) return existing.id;
       const id = newId();
-      setToasts((ts) => [...ts, { id, message, action }]);
+      const toast = { id, message, action };
+      toastsRef.current = [...toastsRef.current, toast];
+      setToasts((ts) => [...ts, toast]);
       setTimeout(() => dismissToast(id), TOAST_MS);
+      return id;
     },
     [dismissToast],
   );
 
+  /** Write the index, merging in summaries another tab may have added since we last read it. */
   const commitIndex = useCallback(
     (next: StorageIndex) => {
-      indexRef.current = next;
-      setIndex(next);
-      adapter.saveIndex(next);
+      let stored: StorageIndex | null = null;
+      try {
+        stored = adapter.loadIndex();
+      } catch {
+        /* unreadable index: write ours */
+      }
+      const merged: StorageIndex = stored
+        ? { activeId: next.activeId, characters: mergeSummaries(next.characters, stored.characters) }
+        : next;
+      indexRef.current = merged;
+      setIndex(merged);
+      adapter.saveIndex(merged);
     },
     [adapter],
   );
-
-  const saveFailedRef = useRef(false);
 
   const flush = useCallback(() => {
     if (timerRef.current) {
@@ -163,7 +188,7 @@ export function CharacterProvider({ adapter, children }: { adapter: StorageAdapt
   const dispatch = useCallback(
     (action: Action) => {
       const prev = characterRef.current;
-      if (action.type === 'hp') setHpBefore(prev.combat.hp);
+      if (action.type === 'hp') setHpBefore({ current: prev.combat.hp.current, temp: prev.combat.hp.temp });
       const next = characterReducer(prev, action);
       characterRef.current = next;
       setCharacter(next);
@@ -187,8 +212,10 @@ export function CharacterProvider({ adapter, children }: { adapter: StorageAdapt
   // Flush on unload so the last keystrokes are never lost.
   useEffect(() => {
     window.addEventListener('beforeunload', flush);
+    window.addEventListener('pagehide', flush);
     return () => {
       window.removeEventListener('beforeunload', flush);
+      window.removeEventListener('pagehide', flush);
       flush();
     };
   }, [flush]);
@@ -198,26 +225,34 @@ export function CharacterProvider({ adapter, children }: { adapter: StorageAdapt
     return adapter.subscribe((change) => {
       if (change.type === 'index') {
         const stored = adapter.loadIndex();
-        // Keep our own active id; only take the summaries.
         setIndex((cur) => {
-          const next = { activeId: cur.activeId, characters: stored.characters };
+          // Keep our own active id and make sure our open character stays listed.
+          const theirs = stored.characters.some((s) => s.id === characterRef.current.id)
+            ? stored.characters
+            : [...stored.characters, summaryOf(characterRef.current)];
+          const next = { activeId: cur.activeId, characters: theirs };
           indexRef.current = next;
           return next;
         });
         return;
       }
       if (change.id !== characterRef.current.id) return;
+      const external = adapter.loadCharacter(change.id);
+      if (!external) {
+        // Deleted elsewhere. Our in-memory copy is the only one left: write it back now and say so.
+        pushToast(OTHER_TAB_DELETED_MESSAGE);
+        pendingRef.current = true;
+        flush();
+        return;
+      }
       if (pendingRef.current) {
         pushToast(OTHER_TAB_MESSAGE);
         return;
       }
-      const external = adapter.loadCharacter(change.id);
-      if (external) {
-        characterRef.current = external;
-        setCharacter(external);
-      }
+      characterRef.current = external;
+      setCharacter(external);
     });
-  }, [adapter, pushToast]);
+  }, [adapter, flush, pushToast]);
 
   const activate = useCallback(
     (c: Character, nextIndex: StorageIndex) => {
@@ -287,6 +322,24 @@ export function CharacterProvider({ adapter, children }: { adapter: StorageAdapt
     [adapter, commitIndex, dispatch],
   );
 
+  /** Like commitIndex, but a summary another tab still lists for the deleted id must not come back. */
+  const commitIndexRemoving = useCallback(
+    (removedId: string, next: StorageIndex) => {
+      let stored: StorageIndex | null = null;
+      try {
+        stored = adapter.loadIndex();
+      } catch {
+        /* write ours */
+      }
+      const theirs = (stored?.characters ?? []).filter((s) => s.id !== removedId);
+      const merged = { activeId: next.activeId, characters: mergeSummaries(next.characters, theirs) };
+      indexRef.current = merged;
+      setIndex(merged);
+      adapter.saveIndex(merged);
+    },
+    [adapter],
+  );
+
   const remove = useCallback(
     (id: string) => {
       const wasActive = id === characterRef.current.id;
@@ -301,20 +354,25 @@ export function CharacterProvider({ adapter, children }: { adapter: StorageAdapt
       adapter.deleteCharacter(id);
       const remaining = indexRef.current.characters.filter((s) => s.id !== id);
       if (!wasActive) {
-        commitIndex({ ...indexRef.current, characters: remaining });
+        commitIndexRemoving(id, { ...indexRef.current, characters: remaining });
         return;
       }
-      const nextSummary = remaining[0];
-      const next = nextSummary ? adapter.loadCharacter(nextSummary.id) : null;
+      const next = remaining.map((s) => adapter.loadCharacter(s.id)).find((c) => c !== null) ?? null;
       if (next) {
-        activate(next, { activeId: next.id, characters: remaining });
+        characterRef.current = next;
+        setCharacter(next);
+        setHpBefore(null);
+        commitIndexRemoving(id, { activeId: next.id, characters: remaining });
       } else {
         const fresh = newCharacter();
         adapter.saveCharacter(fresh);
-        activate(fresh, upsertSummary({ activeId: fresh.id, characters: remaining }, fresh, fresh.id));
+        characterRef.current = fresh;
+        setCharacter(fresh);
+        setHpBefore(null);
+        commitIndexRemoving(id, upsertSummary({ activeId: fresh.id, characters: remaining }, fresh, fresh.id));
       }
     },
-    [activate, adapter, commitIndex, flush],
+    [adapter, commitIndexRemoving, flush],
   );
 
   const loadAll = useCallback((): Character[] => {
@@ -349,7 +407,7 @@ export function CharacterProvider({ adapter, children }: { adapter: StorageAdapt
         first ??= c;
       }
       if (first) activate(first, idx);
-      return { ok: true, count: parsed.characters.length };
+      return { ok: true, count: parsed.characters.length, skipped: parsed.skipped };
     },
     [activate, adapter, flush],
   );

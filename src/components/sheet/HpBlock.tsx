@@ -13,21 +13,24 @@ const QUICK: { label: string; delta: number }[] = [
 /** Current / max / temp HP with quick ± buttons and single-level undo via toast. */
 export function HpBlock() {
   const { character, dispatch, undoHp } = useCharacter();
-  const { pushToast } = useToast();
+  const { pushToast, dismissToast } = useToast();
   const hp = character.combat.hp;
-
-  const adjust = (delta: number) => {
-    dispatch({ type: 'hp', delta });
-    const verb = delta < 0 ? 'Took' : 'Healed';
-    pushToast(`${verb} ${Math.abs(delta)} hit point${Math.abs(delta) === 1 ? '' : 's'}`, {
-      label: 'Undo',
-      onClick: () => undoRef.current?.(),
-    });
-  };
 
   // undoHp is recomputed after dispatch; the toast reads the latest one when clicked.
   const undoRef = useRef(undoHp);
   undoRef.current = undoHp;
+  // Only the most recent change is undoable, so only one Undo toast is ever shown.
+  const lastToastRef = useRef<string | null>(null);
+
+  const adjust = (delta: number) => {
+    dispatch({ type: 'hp', delta });
+    if (lastToastRef.current) dismissToast(lastToastRef.current);
+    const verb = delta < 0 ? 'Took' : 'Healed';
+    lastToastRef.current = pushToast(`${verb} ${Math.abs(delta)} hit point${Math.abs(delta) === 1 ? '' : 's'}`, {
+      label: 'Undo',
+      onClick: () => undoRef.current?.(),
+    });
+  };
 
   const setHp = (patch: Partial<typeof hp>) => dispatch({ type: 'patch', patch: { combat: { hp: patch } } });
 

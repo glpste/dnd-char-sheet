@@ -4,6 +4,14 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>D&amp;D character sheet</title>
+    <script>
+      // Apply the stored theme before first paint so light-mode users never see a dark flash.
+      try {
+        if (localStorage.getItem('dnd-sheet:theme') === 'light') {
+          document.documentElement.classList.remove('dark');
+        }
+      } catch (e) {}
+    </script>
   </head>
   <body>
     <div id="root"></div>
