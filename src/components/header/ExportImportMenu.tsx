@@ -56,11 +56,13 @@ export function ExportImportMenu() {
     handleJsonText(await file.text());
   };
 
+  const closePaste = () => {
+    setPasteOpen(false);
+    setPasteText('');
+  };
+
   const submitPaste = () => {
-    if (handleJsonText(pasteText)) {
-      setPasteOpen(false);
-      setPasteText('');
-    }
+    if (handleJsonText(pasteText)) closePaste();
   };
 
   const finishImport = (mode: 'add' | 'replace') => {
@@ -135,7 +137,7 @@ export function ExportImportMenu() {
           e.target.value = '';
         }}
       />
-      <ConfirmDialog open={pasteOpen} title="Paste JSON" confirmLabel="Import" onConfirm={submitPaste} onCancel={() => setPasteOpen(false)}>
+      <ConfirmDialog open={pasteOpen} title="Paste JSON" confirmLabel="Import" onConfirm={submitPaste} onCancel={closePaste}>
         <p>Paste an exported character (or export file) below.</p>
         <textarea
           aria-label="Character JSON"
