@@ -16,6 +16,8 @@ export function ExportImportMenu() {
   const { pushToast } = useToast();
   const [open, setOpen] = useState(false);
   const [pendingImport, setPendingImport] = useState<{ json: string; count: number; skipped: number } | null>(null);
+  const [pasteOpen, setPasteOpen] = useState(false);
+  const [pasteText, setPasteText] = useState('');
   const rootRef = useRef<HTMLDivElement>(null);
   const fileRef = useRef<HTMLInputElement>(null);
 
@@ -38,15 +40,27 @@ export function ExportImportMenu() {
   const activeName = summaries.find((s) => s.id === activeId)?.name ?? 'character';
   const today = new Date().toISOString().slice(0, 10);
 
-  const onFile = async (file: File | undefined) => {
-    if (!file) return;
-    const json = await file.text();
+  /** Parses pasted or loaded JSON and, if valid, asks how to import it. Returns whether it parsed. */
+  const handleJsonText = (json: string): boolean => {
     const parsed = parseImport(json);
     if (!parsed.ok) {
       pushToast(parsed.error);
-      return;
+      return false;
     }
     setPendingImport({ json, count: parsed.characters.length, skipped: parsed.skipped });
+    return true;
+  };
+
+  const onFile = async (file: File | undefined) => {
+    if (!file) return;
+    handleJsonText(await file.text());
+  };
+
+  const submitPaste = () => {
+    if (handleJsonText(pasteText)) {
+      setPasteOpen(false);
+      setPasteText('');
+    }
   };
 
   const finishImport = (mode: 'add' | 'replace') => {
@@ -97,6 +111,17 @@ export function ExportImportMenu() {
           >
             Import from file…
           </button>
+          <button
+            role="menuitem"
+            type="button"
+            className={menuItem}
+            onClick={() => {
+              setOpen(false);
+              setPasteOpen(true);
+            }}
+          >
+            Paste JSON…
+          </button>
         </div>
       )}
       <input
@@ -110,6 +135,16 @@ export function ExportImportMenu() {
           e.target.value = '';
         }}
       />
+      <ConfirmDialog open={pasteOpen} title="Paste JSON" confirmLabel="Import" onConfirm={submitPaste} onCancel={() => setPasteOpen(false)}>
+        <p>Paste an exported character (or export file) below.</p>
+        <textarea
+          aria-label="Character JSON"
+          className="mt-2 h-40 w-full rounded border border-zinc-300 bg-white p-2 font-mono text-xs text-zinc-900 dark:border-zinc-600 dark:bg-zinc-950 dark:text-zinc-100"
+          value={pasteText}
+          onChange={(e) => setPasteText(e.target.value)}
+          spellCheck={false}
+        />
+      </ConfirmDialog>
       <ConfirmDialog
         open={pendingImport !== null}
         title="Import characters"
