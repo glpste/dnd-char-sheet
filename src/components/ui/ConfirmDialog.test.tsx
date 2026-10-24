@@ -40,3 +40,24 @@ describe('ConfirmDialog', () => {
     expect(screen.getByRole('button', { name: 'opener' })).toHaveFocus();
   });
 });
+
+describe('ConfirmDialog with a controlled child', () => {
+  function PasteHarness() {
+    const [open, setOpen] = useState(true);
+    const [text, setText] = useState('');
+    return (
+      <ConfirmDialog open={open} title="Paste" confirmLabel="Import" onConfirm={() => {}} onCancel={() => setOpen(false)}>
+        <textarea aria-label="Box" value={text} onChange={(e) => setText(e.target.value)} />
+      </ConfirmDialog>
+    );
+  }
+
+  it('keeps focus and value in the child while typing, despite an inline onCancel', async () => {
+    render(<PasteHarness />);
+    const box = screen.getByRole('textbox', { name: 'Box' });
+    await userEvent.click(box);
+    await userEvent.type(box, 'abc');
+    expect(box).toHaveValue('abc');
+    expect(box).toHaveFocus();
+  });
+});

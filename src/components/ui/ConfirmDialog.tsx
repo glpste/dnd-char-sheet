@@ -33,6 +33,9 @@ export function ConfirmDialog({
 }: ConfirmDialogProps) {
   const confirmRef = useRef<HTMLButtonElement>(null);
   const panelRef = useRef<HTMLDivElement>(null);
+  // Read through a ref so an inline onCancel does not re-run the focus effect on every render.
+  const onCancelRef = useRef(onCancel);
+  onCancelRef.current = onCancel;
 
   useEffect(() => {
     if (!open) return;
@@ -40,7 +43,7 @@ export function ConfirmDialog({
     confirmRef.current?.focus();
     const onKey = (e: globalThis.KeyboardEvent) => {
       if (e.key === 'Escape') {
-        onCancel();
+        onCancelRef.current();
         return;
       }
       if (e.key !== 'Tab' || !panelRef.current) return;
@@ -62,7 +65,7 @@ export function ConfirmDialog({
       window.removeEventListener('keydown', onKey);
       opener?.focus();
     };
-  }, [open, onCancel]);
+  }, [open]);
 
   if (!open) return null;
 
