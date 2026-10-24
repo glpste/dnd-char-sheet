@@ -1,7 +1,8 @@
 import { useCharacter } from '../../store/useCharacter';
 import { Panel } from '../ui/StatBox';
-import { btn } from '../ui/styles';
+import { btn, cx } from '../ui/styles';
 import { WeaponRow } from './WeaponRow';
+import { WEAPON_GRID } from './weaponGrid';
 
 /** Weapons list; the scroll region caps height so column C never grows past the viewport. */
 export function WeaponsTable() {
@@ -17,7 +18,7 @@ export function WeaponsTable() {
         </button>
       }
     >
-      <div className="grid grid-cols-[1rem_1.3fr_3.2rem_1.3fr_0.7fr] gap-1 border-b border-zinc-200 pb-0.5 text-[10px] uppercase tracking-wide text-zinc-400 dark:border-zinc-800 dark:text-zinc-500">
+      <div className={cx(WEAPON_GRID, 'border-b border-zinc-200 pb-0.5 text-[10px] uppercase tracking-wide text-zinc-400 dark:border-zinc-800 dark:text-zinc-500')}>
         <span />
         <span>Name</span>
         <span>Atk</span>

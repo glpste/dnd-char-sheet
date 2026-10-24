@@ -8,6 +8,7 @@ import { NumberField } from '../ui/NumberField';
 import { TextArea } from '../ui/TextArea';
 import { TextField } from '../ui/TextField';
 import { btnGhost, cx, input } from '../ui/styles';
+import { WEAPON_GRID } from './weaponGrid';
 
 const ABILITY_OPTIONS: { value: WeaponAbility; label: string }[] = [
   { value: 'str', label: 'STR' },
@@ -45,7 +46,7 @@ export function WeaponRow({ weapon, index, count }: { weapon: Weapon; index: num
 
   return (
     <li data-testid="weapon-row" className="border-b border-zinc-200 py-1 last:border-b-0 dark:border-zinc-800">
-      <div className="grid grid-cols-[1rem_1.3fr_3.2rem_1.3fr_0.7fr] items-center gap-1 text-sm">
+      <div className={cx(WEAPON_GRID, 'items-center text-sm')}>
         <button
           type="button"
           aria-label={`${open ? 'Collapse' : 'Expand'} ${name}`}
